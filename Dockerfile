@@ -1,19 +1,28 @@
+FROM golang:1.22.5-alpine AS builder
 
-FROM nginx:alpine
+WORKDIR /app
 
-COPY ./nginx/default.conf /etc/nginx/conf.d/default.conf 
+COPY ./server/go.mod ./server/go.sum ./
 
-WORKDIR /blog
+RUN go mod download
 
-COPY ./client/build /var/www/html
+COPY . .
 
-COPY ./server/.env.prod .
+WORKDIR /app/server
 
-COPY ./server/build/server .
+RUN go build -o main .
 
-COPY ./startup.sh .
+FROM alpine:latest
 
-EXPOSE 80
+WORKDIR /root/
+
+COPY --from=builder /app/server/main .
+
+# Copy the .env file if necessary (optional)
+COPY --from=builder /app/server/.env .
+COPY --from=builder /app/client ./client
+
 EXPOSE 8000
 
-ENTRYPOINT [ "/bin/sh", "startup.sh" ]
+CMD ["./main"]
+
